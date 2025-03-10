@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Celevo</title>
+    <link
+      href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='css/styles.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <div class="sidebar" id="sidebar">
+      <img
+        src="{{ url_for('static', filename='img/logo.svg') }}"
+        alt="Logo"
+        class="logo"
+      />
+      <nav class="nav flex-column">
+        {% for menus in menu %}
+        <a
+          href="{{ menus.url_path }}"
+          class="nav-link {% if menus.active %}active{% endif %}"
+          ><img
+            src="{{ url_for('static', filename='img/' + (menus['hover_image_url'] if menus.active else menus['image_url'])) }}"
+            alt="{{menus['name']}}"
+            data-default="{{ url_for('static', filename='img/' + menus['image_url'])}}"
+            data-hover="{{ url_for('static', filename='img/' + menus['hover_image_url'])}}"
+          />
+          <span>{{menus['name']}}</span></a
+        >
+        {% endfor %}
+      </nav>
+    </div>
+    <div class="content">{% block content %}{% endblock %}</div>
+    {% block extra_js %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+      // Menambahkan event listener untuk hover
+      document.querySelectorAll(".nav-link").forEach((card) => {
+        const img = card.querySelector("img");
+
+        card.addEventListener("mouseover", function () {
+          if (!this.classList.contains("active")) {
+            img.src = img.getAttribute("data-hover");
+          }
+        });
+
+        card.addEventListener("mouseout", function () {
+          if (!this.classList.contains("active")) {
+            img.src = img.getAttribute("data-default");
+          }
+        });
+      });
+
+      function changeImage(element, newSrc) {
+        element.querySelector("img").src = newSrc;
+      }
+    </script>
+  </body>
+</html>
