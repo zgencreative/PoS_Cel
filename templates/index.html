@@ -5,7 +5,9 @@
     <input
       type="text"
       class="search-bar"
+      id="search-input"
       placeholder="Search Product here..."
+      oninput="filterProductsBySearch()"
     />
   </div>
 
@@ -38,11 +40,21 @@
     <!-- Customer Name -->
     <div>
       <h5 class="d-flex justify-content-between align-items-center">
-        <b>Customer Name</b>
+        <b id="customerNameText">Customer Name</b>
+        <input
+          type="text"
+          id="customerNameInput"
+          class="form-control d-none"
+          value="Customer Name"
+          onblur="saveCustomerName()"
+          onkeydown="handleKeyPress(event)"
+        />
         <img
           src="{{ url_for('static', filename='img/logo-edit.svg') }}"
           alt="Edit"
           width="20"
+          style="cursor: pointer"
+          onclick="editCustomerName()"
         />
       </h5>
 
@@ -55,7 +67,7 @@
     <div>
       <div class="order-summary">
         <p>Sub Total <span class="float-end" id="subtotal"></span></p>
-        <p>Tax 5% <span class="float-end">Rp. 6.075</span></p>
+        <p>Tax<span class="float-end">Rp. 6.075</span></p>
         <hr />
         <h5><b>Total Amount</b> <span class="float-end">Rp. 127.591</span></h5>
       </div>
@@ -63,7 +75,7 @@
       <!-- Payment Methods -->
       <div class="d-flex justify-content-center gap-3">
         <!-- Cash -->
-        <div class="payment-option">
+        <div class="payment-option" onclick="selectPayment(this, 'Cash')">
           <img
             src="{{ url_for('static', filename='img/cash-pay.svg') }}"
             alt="Cash"
@@ -71,8 +83,12 @@
           />
           <p class="mt-2 mb-0">Cash</p>
         </div>
+
         <!-- Card/Debit -->
-        <div class="payment-option">
+        <div
+          class="payment-option"
+          onclick="selectPayment(this, 'Card/Debit Card')"
+        >
           <img
             src="{{ url_for('static', filename='img/debit-pay.svg') }}"
             alt="Card"
@@ -80,8 +96,9 @@
           />
           <p class="mt-2 mb-0">Card/Debit Card</p>
         </div>
+
         <!-- QR Code -->
-        <div class="payment-option">
+        <div class="payment-option" onclick="selectPayment(this, 'QR Code')">
           <img
             src="{{ url_for('static', filename='img/qr-pay.svg') }}"
             alt="QR Code"
@@ -91,165 +108,331 @@
         </div>
       </div>
 
+      <input type="hidden" id="selectedPayment" name="payment_method" />
+      <input type="hidden" id="totalPrice" name="total_price" />
+
       <!-- Place Order Button -->
-      <button class="btn-order mt-3">Place Order</button>
+      <button class="btn-order mt-3" onclick="placeOrder()">Place Order</button>
     </div>
   </div>
 </div>
 {% endblock %} {% block extra_js %}
 <script>
-    const allProducts = {{ data.products | tojson }};  // Produk dikirim dari backend
-  const cart = {}; // Objek untuk menyimpan belanjaan
-
-  function changeImage(element, newSrc) {
-    element.querySelector("img").src = newSrc;
+  function getActiveCategoryId() {
+    const activeCategory = document.querySelector(".category-card.active");
+    return activeCategory
+      ? parseInt(activeCategory.getAttribute("id").split("-")[1])
+      : null;
   }
+  function filterProductsBySearch() {
+    const searchQuery = document
+      .getElementById("search-input")
+      .value.toLowerCase(); // Ambil input pencarian
+    const categoryId = getActiveCategoryId(); // Dapatkan kategori yang aktif
 
-  function filterProducts(categoryId) {
-      const productContainer = document.getElementById("product-container");
-      productContainer.innerHTML = "";
+    const selectedProducts = allProducts[categoryId] || []; // Ambil produk berdasarkan kategori
 
-      const selectedProducts = allProducts[categoryId] || [];
-
-      selectedProducts.forEach(product => {
-          const quantity = cart[product.name]?.quantity || 0;
-
-          productContainer.innerHTML += `
-              <div class="product-card">
-                  <img src="/static/img/${product.image_url}" alt="${product.name}" />
-                  <div class="product-info">
-                      <h5>${product.name}</h5>
-                      <p>Rp. ${parseInt(product.price).toLocaleString("id-ID").replace(/,/g, ".")}</p>
-                  </div>
-                  ${
-                      quantity > 0
-                          ? `<div class="counter">
-                                <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
-                                <span class="quantity">${quantity}</span>
-                                <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
-                             </div>`
-                          : `<div class="add-btn"
-                                data-name="${product.name}"
-                                data-price="${product.price}"
-                                data-image="${product.image_url}"
-                                data-category="${categoryId}">
-                                Add to Dish
-                             </div>`
-                  }
-              </div>`;
-      });
-
-      document.querySelectorAll(".category-card").forEach(el => {
-        el.classList.remove("active");
-        // Kembalikan gambar ke default jika tidak aktif
-        const img = el.querySelector("img");
-        img.src = img.getAttribute("data-default");
-      });
-      // Tambahkan class active ke kategori yang dipilih
-      const activeCard = document.getElementById(`cat-${categoryId}`);
-      activeCard.classList.add("active");
-
-      // Ubah gambar ke hover_image_url saat aktif
-      const activeImg = activeCard.querySelector("img");
-      activeImg.src = activeImg.getAttribute("data-hover");
-
-      updateOrderList();
-  }
-
-  // Menambahkan event listener untuk hover
-  document.querySelectorAll(".category-card").forEach(card => {
-    const img = card.querySelector("img");
-
-    card.addEventListener("mouseover", function () {
-        if (!this.classList.contains("active")) {
-            img.src = img.getAttribute("data-hover");
-        }
+    const filteredProducts = selectedProducts.filter((product) => {
+      return product.name.toLowerCase().includes(searchQuery); // Filter produk berdasarkan nama
     });
 
-    card.addEventListener("mouseout", function () {
-        if (!this.classList.contains("active")) {
-            img.src = img.getAttribute("data-default");
-        }
+    const productContainer = document.getElementById("product-container");
+    productContainer.innerHTML = ""; // Reset produk yang ditampilkan
+
+    // Menampilkan produk yang sudah difilter
+    filteredProducts.forEach((product) => {
+      const quantity = cart[product.name]?.quantity || 0;
+
+      productContainer.innerHTML += `
+            <div class="product-card">
+                <img src="/static/img/${product.image_url}" alt="${
+        product.name
+      }" />
+                <div class="product-info">
+                    <h5>${product.name}</h5>
+                    <p>Rp. ${parseInt(product.price)
+                      .toLocaleString("id-ID")
+                      .replace(/,/g, ".")}</p>
+                </div>
+                ${
+                  quantity > 0
+                    ? `<div class="counter">
+                              <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
+                              <span class="quantity">${quantity}</span>
+                              <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
+                           </div>`
+                    : `<div class="add-btn"
+                              data-id="${product.id}"
+                              data-name="${product.name}"
+                              data-price="${product.price}"
+                              data-image="${product.image_url}"
+                              data-category="${categoryId}">
+                              Add to Dish
+                           </div>`
+                }
+            </div>`;
     });
-  });
+  }
+  function selectPayment(element, paymentMethod) {
+    // Hilangkan kelas "active" dari semua opsi
+    document.querySelectorAll(".payment-option").forEach((option) => {
+      option.classList.remove("active");
+    });
 
-  // Pilih kategori "All" saat halaman pertama kali dimuat
-  document.addEventListener("DOMContentLoaded", function () {
-      filterProducts(0);
-  });
+    // Tambahkan kelas "active" ke opsi yang dipilih
+    element.classList.add("active");
 
-  // Event delegation untuk Add to Dish
-  document.getElementById("product-container").addEventListener("click", function (e) {
-      if (e.target.classList.contains("add-btn")) {
-          const name = e.target.dataset.name;
-          const price = parseFloat(e.target.dataset.price);
-          const image = e.target.dataset.image;
+    // Simpan pilihan di input hidden
+    document.getElementById("selectedPayment").value = paymentMethod;
+  }
+  function editCustomerName() {
+    // Ambil elemen
+    let textElement = document.getElementById("customerNameText");
+    let inputElement = document.getElementById("customerNameInput");
 
-          if (!cart[name]) {
-              cart[name] = { quantity: 1, price, image };
-          }
+    // Sembunyikan teks, tampilkan input
+    textElement.classList.add("d-none");
+    inputElement.classList.remove("d-none");
+    inputElement.focus();
+  }
 
-          filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
-          updateOrderList();
+  function saveCustomerName() {
+    let textElement = document.getElementById("customerNameText");
+    let inputElement = document.getElementById("customerNameInput");
+
+    // Jika input tidak kosong, ubah teksnya
+    if (inputElement.value.trim() !== "") {
+      textElement.innerText = inputElement.value;
+    }
+
+    // Tampilkan teks kembali, sembunyikan input
+    textElement.classList.remove("d-none");
+    inputElement.classList.add("d-none");
+  }
+
+  function handleKeyPress(event) {
+    if (event.key === "Enter") {
+      saveCustomerName();
+    }
+  }
+</script>
+<script>
+      const allProducts = {{ data.products | tojson }};  // Produk dikirim dari backend
+    const cart = {}; // Objek untuk menyimpan belanjaan
+
+    function changeImage(element, newSrc) {
+      element.querySelector("img").src = newSrc;
+    }
+
+    function filterProducts(categoryId) {
+        const productContainer = document.getElementById("product-container");
+        productContainer.innerHTML = "";
+
+        const selectedProducts = allProducts[categoryId] || [];
+
+        selectedProducts.forEach(product => {
+            const quantity = cart[product.name]?.quantity || 0;
+
+            productContainer.innerHTML += `
+                <div class="product-card">
+                    <img src="/static/img/${product.image_url}" alt="${product.name}" />
+                    <div class="product-info">
+                        <h5>${product.name}</h5>
+                        <p>Rp. ${parseInt(product.price).toLocaleString("id-ID").replace(/,/g, ".")}</p>
+                    </div>
+                    ${
+                        quantity > 0
+                            ? `<div class="counter">
+                                  <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
+                                  <span class="quantity">${quantity}</span>
+                                  <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
+                               </div>`
+                            : `<div class="add-btn"
+                                  data-id="${product.id}"
+                                  data-name="${product.name}"
+                                  data-price="${product.price}"
+                                  data-image="${product.image_url}"
+                                  data-category="${categoryId}">
+                                  Add to Dish
+                               </div>`
+                    }
+                </div>`;
+        });
+
+        document.querySelectorAll(".category-card").forEach(el => {
+          el.classList.remove("active");
+          // Kembalikan gambar ke default jika tidak aktif
+          const img = el.querySelector("img");
+          img.src = img.getAttribute("data-default");
+        });
+        // Tambahkan class active ke kategori yang dipilih
+        const activeCard = document.getElementById(`cat-${categoryId}`);
+        activeCard.classList.add("active");
+
+        // Ubah gambar ke hover_image_url saat aktif
+        const activeImg = activeCard.querySelector("img");
+        activeImg.src = activeImg.getAttribute("data-hover");
+
+        updateOrderList();
+    }
+
+    async function placeOrder() {
+      // Cek apakah cart kosong
+      if (Object.keys(cart).length === 0) {
+          alert("Cart is empty! Please add items before placing an order.");
+          return;
       }
-  });
 
-  // Event delegation untuk increase dan decrease
-  document.getElementById("product-container").addEventListener("click", function (e) {
-      if (e.target.classList.contains("increase")) {
-          const name = e.target.dataset.name;
-          cart[name].quantity += 1;
-          updateOrderList();
-          filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
-      }
+      // Ambil data dari form
+      const custName = document.getElementById("customerNameText").innerText;
+      const payment = document.getElementById("selectedPayment").value;
+      const total = document.getElementById("totalPrice").value;
 
-      if (e.target.classList.contains("decrease")) {
-          const name = e.target.dataset.name;
-          if (cart[name].quantity > 1) {
-              cart[name].quantity -= 1;
+      // Format isi cart untuk dikirim ke backend
+      const orderItems = Object.keys(cart).map(name => ({
+          product_id: cart[name].id,
+          quantity: cart[name].quantity,
+          price: cart[name].price
+      }));
+
+      // Data yang akan dikirim ke API Flask
+      const orderData = {
+          customer_name: custName,
+          customer_contact: "",
+          member_id: "",
+          total_price: total,
+          payment_method: payment,
+          payment_status: "pending", // Bisa disesuaikan
+          due_date: null, // Bisa disesuaikan jika ada jatuh tempo
+          orders: orderItems
+      };
+
+      try {
+          // Kirim data ke API Flask
+          const response = await fetch("/create_order", {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json"
+              },
+              body: JSON.stringify(orderData)
+          });
+
+          // Ambil response dari server
+          const result = await response.json();
+
+          if (response.ok) {
+              alert(`Order berhasil dibuat! Invoice ID: ${result.invoice_id}`);
+              cart = {};  // Kosongkan cart setelah order sukses
           } else {
-              delete cart[name];
+              alert(`Gagal membuat order: ${result.error}`);
           }
-          updateOrderList();
-          filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+
+      } catch (error) {
+          console.error("Error placing order:", error);
+          alert("Terjadi kesalahan, silakan coba lagi.");
       }
-  });
+  }
 
-  function updateOrderList() {
-      const orderList = document.querySelector(".order-list");
-      orderList.innerHTML = "";
 
-      let totalPrice = 0;
+    // Menambahkan event listener untuk hover
+    document.querySelectorAll(".category-card").forEach(card => {
+      const img = card.querySelector("img");
 
-      Object.keys(cart).forEach(name => {
-          const item = cart[name];
-          const totalItemPrice = item.price * item.quantity;
-          totalPrice += totalItemPrice;
-
-          orderList.innerHTML += `
-              <div class="order-item d-flex align-items-start">
-                  <img src="/static/img/${item.image}" alt="${name}" />
-                  <div class="flex-grow-1 d-flex flex-column gap-2">
-                      <div class="d-flex justify-content-between align-items-start">
-                          <b class="order-title">${name}</b>
-                          <small class="text-muted">Rp. ${item.price.toLocaleString("id-ID").replace(/,/g, ".")}</small>
-                      </div>
-                      <div class="d-flex justify-content-between align-items-end">
-                          <small>${item.quantity}x</small>
-                          <strong class="price">Rp. ${totalItemPrice.toLocaleString("id-ID").replace(/,/g, ".")}</strong>
-                      </div>
-                  </div>
-              </div>`;
+      card.addEventListener("mouseover", function () {
+          if (!this.classList.contains("active")) {
+              img.src = img.getAttribute("data-hover");
+          }
       });
 
-      if (totalPrice > 0) {
-        const subtotal = document.getElementById("subtotal");
-        subtotal.textContent = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
-      } else {
-          const subtotal = document.getElementById("subtotal");
-          subtotal.textContent = "Rp. 0";
-      }
+      card.addEventListener("mouseout", function () {
+          if (!this.classList.contains("active")) {
+              img.src = img.getAttribute("data-default");
+          }
+      });
+    });
 
-  }
+    // Pilih kategori "All" saat halaman pertama kali dimuat
+    document.addEventListener("DOMContentLoaded", function () {
+        filterProducts(0);
+    });
+
+    // Event delegation untuk Add to Dish
+    document.getElementById("product-container").addEventListener("click", function (e) {
+        if (e.target.classList.contains("add-btn")) {
+            const id = e.target.dataset.id;
+            const name = e.target.dataset.name;
+            const price = parseFloat(e.target.dataset.price);
+            const image = e.target.dataset.image;
+
+            if (!cart[name]) {
+                cart[name] = { id, quantity: 1, price, image };
+            }
+
+            filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+            updateOrderList();
+        }
+    });
+
+    // Event delegation untuk increase dan decrease
+    document.getElementById("product-container").addEventListener("click", function (e) {
+        if (e.target.classList.contains("increase")) {
+            const name = e.target.dataset.name;
+            cart[name].quantity += 1;
+            updateOrderList();
+            filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+        }
+
+        if (e.target.classList.contains("decrease")) {
+            const name = e.target.dataset.name;
+            if (cart[name].quantity > 1) {
+                cart[name].quantity -= 1;
+            } else {
+                delete cart[name];
+            }
+            updateOrderList();
+            filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+        }
+    });
+
+    function updateOrderList() {
+        const orderList = document.querySelector(".order-list");
+        orderList.innerHTML = "";
+
+        let totalPrice = 0;
+
+        Object.keys(cart).forEach(name => {
+            const item = cart[name];
+            const totalItemPrice = item.price * item.quantity;
+            totalPrice += totalItemPrice;
+
+            orderList.innerHTML += `
+                <div class="order-item d-flex align-items-start">
+                    <img src="/static/img/${item.image}" alt="${name}" />
+                    <div class="flex-grow-1 d-flex flex-column gap-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <b class="order-title">${name}</b>
+                            <small class="text-muted">Rp. ${item.price.toLocaleString("id-ID").replace(/,/g, ".")}</small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <small>${item.quantity}x</small>
+                            <strong class="price">Rp. ${totalItemPrice.toLocaleString("id-ID").replace(/,/g, ".")}</strong>
+                        </div>
+                    </div>
+                </div>`;
+        });
+
+        if (totalPrice > 0) {
+          const subtotal = document.getElementById("subtotal");
+          const total_price = document.getElementById("totalPrice");
+          total_price.value = totalPrice;
+          subtotal.textContent = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
+        } else {
+            const subtotal = document.getElementById("subtotal");
+            const total_price = document.getElementById("totalPrice");
+            total_price.value = totalPrice;
+            subtotal.textContent = "Rp. 0";
+        }
+
+    }
 </script>
 {% endblock %}

@@ -59,11 +59,49 @@ CREATE TABLE IF NOT EXISTS submenus (
 );
 """
 
+# Query untuk membuat tabel order_history
+create_order_table = """
+CREATE TABLE IF NOT EXISTS order_history (
+    id SERIAL PRIMARY KEY,
+    customer_id INT NOT NULL,
+    invoice_id INT NULL REFERENCES invoice(id) ON DELETE SET NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+# Query untuk membuat tabel invoice
+create_invoice_table = """
+CREATE TABLE IF NOT EXISTS invoice (
+    id SERIAL PRIMARY KEY,
+    customer_id INT NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    payment_method VARCHAR(50) NOT NULL,
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'unpaid',
+    order_status VARCHAR(50) NOT NULL DEFAULT 'pending'
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    due_date TIMESTAMP NULL
+);
+"""
+
+create_customer_table = """
+CREATE TABLE IF NOT EXISTS customer (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    contact VARCHAR(50) NOT NULL,
+    member_id VARCHAR(50) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
 # Eksekusi query
-cursor.execute(create_menus_table)
-cursor.execute(create_categories_table)
-cursor.execute(create_products_table)
-cursor.execute(create_submenus_table)
+cursor.execute(create_customer_table)
+# cursor.execute(create_order_table)
+# cursor.execute(create_products_table)
+# cursor.execute(create_submenus_table)
 
 # Commit perubahan
 conn.commit()

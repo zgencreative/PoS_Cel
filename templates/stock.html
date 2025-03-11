@@ -1,1 +1,208 @@
-{% include "templates.html" %}
+{% include "templates.html" %} {% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %} {% block content %}
+<div class="second-content">
+  <div class="text-center">
+    <input
+      type="text"
+      class="search-bar"
+      placeholder="Search Product here..."
+    />
+  </div>
+  <div class="row m-2">
+    <div class="card-container-stock">
+      <!-- Kartu utama -->
+      <div class="d-flex flex-column custom-card-stock">
+        <div class="d-flex align-items-center mb-2">
+          <div class="custom-icon-stock me-2">
+            <img src="{{ url_for('static', filename='img/logo-sales.svg') }}" />
+            <!-- Bisa diganti dengan ikon -->
+          </div>
+          <span class="custom-text-stock">Total Sales Amount</span>
+        </div>
+        <div class="customer-count-stock">730</div>
+      </div>
+
+      <!-- Footer terpisah tetapi sejajar -->
+      <div class="footer-section-stock">
+        <span class="footer-badge-stock">+ 12 Items</span>
+        <span class="percentage-badge-stock">3% ⬇</span>
+      </div>
+    </div>
+    <div class="card-container-stock">
+      <!-- Kartu utama -->
+      <div class="d-flex flex-column custom-card-stock">
+        <div class="d-flex align-items-center mb-2">
+          <div class="custom-icon-stock me-2">
+            <img
+              src="{{ url_for('static', filename='img/logo-product.svg') }}"
+            />
+            <!-- Bisa diganti dengan ikon -->
+          </div>
+          <span class="custom-text-stock">Total Product Sales</span>
+        </div>
+        <div class="customer-count-stock">730</div>
+      </div>
+
+      <!-- Footer terpisah tetapi sejajar -->
+      <div class="footer-section-stock">
+        <span class="footer-badge-stock">+ 12 Items</span>
+        <span class="percentage-badge-stock">3% ⬇</span>
+      </div>
+    </div>
+    <div class="card-container-stock">
+      <!-- Kartu utama -->
+      <div class="d-flex flex-column custom-card-stock">
+        <div class="d-flex align-items-center mb-2">
+          <div class="custom-icon-stock me-2">
+            <img
+              src="{{ url_for('static', filename='img/logo-product.svg') }}"
+            />
+            <!-- Bisa diganti dengan ikon -->
+          </div>
+          <span class="custom-text-stock">Total Customers</span>
+        </div>
+        <div class="customer-count-stock">730</div>
+      </div>
+
+      <!-- Footer terpisah tetapi sejajar -->
+      <div class="footer-section-stock">
+        <span class="footer-badge-stock">+ 12 Items</span>
+        <span class="percentage-badge-stock">3% ⬇</span>
+      </div>
+    </div>
+    <div class="card-container-stock">
+      <!-- Kartu utama -->
+      <div class="d-flex flex-column custom-card-stock">
+        <div class="d-flex align-items-center mb-2">
+          <div class="custom-icon-stock me-2">
+            <img
+              src="{{ url_for('static', filename='img/logo-profit.svg') }}"
+            />
+            <!-- Bisa diganti dengan ikon -->
+          </div>
+          <span class="custom-text-stock">Net Profit</span>
+        </div>
+        <div class="customer-count-stock">730</div>
+      </div>
+
+      <!-- Footer terpisah tetapi sejajar -->
+      <div class="footer-section-stock">
+        <span class="footer-badge-stock">+ 12 Items</span>
+        <span class="percentage-badge-stock">3% ⬇</span>
+      </div>
+    </div>
+  </div>
+  <div class="row ms-2 me-2">
+    <!-- Chart & Favorite Products -->
+    <div class="chart-stock">
+      <div class="chart-container p-3">
+        <canvas id="myChart"></canvas>
+      </div>
+    </div>
+    <div class="favorite-stock">
+      <div class="card">
+        <h5 class="mb-3">
+          Favorite Product
+          <a href="#" class="float-end text-decoration-none">View All</a>
+        </h5>
+        <hr />
+        <table class="table product-table">
+          <thead class="text-center">
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>Total Orders</th>
+            </tr>
+          </thead>
+          <tbody class="text-center">
+            <tr>
+              <td>
+                <img src="https://via.placeholder.com/40" alt="Roti Keju" />
+              </td>
+              <td>Roti Keju <br /><small>Roti</small></td>
+              <td class="text-end">938 Times</td>
+            </tr>
+            <tr>
+              <td>
+                <img src="https://via.placeholder.com/40" alt="Putri Salju" />
+              </td>
+              <td>Putri Salju <br /><small>Kue Kering</small></td>
+              <td class="text-end">963 Times</td>
+            </tr>
+            <tr>
+              <td>
+                <img src="https://via.placeholder.com/40" alt="Bolu Gulung" />
+              </td>
+              <td>Bolu Gulung Keju <br /><small>Bolu</small></td>
+              <td class="text-end">832 Times</td>
+            </tr>
+            <tr>
+              <td>
+                <img src="https://via.placeholder.com/40" alt="Lapis Legit" />
+              </td>
+              <td>Lapis Legit <br /><small>Bolu</small></td>
+              <td class="text-end">746 Times</td>
+            </tr>
+            <tr>
+              <td><img src="https://via.placeholder.com/40" alt="Nastar" /></td>
+              <td>Nastar <br /><small>Kue Kering</small></td>
+              <td class="text-end">670 Times</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="row stat-stock ms-2 me-2 mt-2">
+    <div class="col-md-4">
+      <div class="card text-center">
+        <h6>Amount</h6>
+        <h4>Rp. 213.239</h4>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <h6>Growth</h6>
+        <h4>+ Rp. 923.372</h4>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <h6>Amount</h6>
+        <h4>↑ Rp. 213.239</h4>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  // Chart.js Bar Chart
+  var ctx = document.getElementById("myChart").getContext("2d");
+  var myChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"],
+      datasets: [
+        {
+          label: "Sales",
+          data: [150, 300, 250, 400, 350, 320, 380],
+          backgroundColor: "rgba(118, 67, 49, 0.6)",
+          borderColor: "rgba(118, 67, 49, 1)",
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+</script>
+{% endblock %}

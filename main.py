@@ -1,5 +1,6 @@
-from flask import Flask, render_template, url_for, redirect, request
-from models import db, Menu, Submenu, Category, Product
+from flask import Flask, render_template, url_for, redirect, request, jsonify
+from models import db, Menu, Submenu, Category, Product, OrderHistory, Invoice, Customer
+import datetime
 
 app = Flask(__name__)
 
@@ -90,53 +91,147 @@ def get_data():
 
     return {"categories": category_list, "products": product_dict}
 
+# API untuk menampilkan daftar Order History dengan filter tanggal & waktu
+@app.route("/orders/<int:invoice_id>", methods=["GET"])
+def get_orders(invoice_id):
+    # Menjalankan query untuk mengambil data berdasarkan invoice_id
+    orders = db.session.query(
+        OrderHistory.id.label("order_id"),
+        OrderHistory.created_at.label("order_date"),
+        OrderHistory.customer_id.label("customer_id"),
+        db.func.sum(OrderHistory.price * OrderHistory.quantity).label("total_payment"),
+        Invoice.payment_status.label("payment_status"),
+        Invoice.id.label("invoice_id"),
+        OrderHistory.product_id.label("product_id"),
+        db.func.sum(OrderHistory.quantity).label("total_quantity"),
+        Product.name.label("product_name"),
+        Product.price.label("product_price")
+    ).join(Invoice, OrderHistory.invoice_id == Invoice.id, isouter=True)\
+     .join(Product, OrderHistory.product_id == Product.id, isouter=True)\
+     .join(Customer, OrderHistory.customer_id == Customer.id, isouter=True)\
+     .filter(OrderHistory.invoice_id == invoice_id)\
+     .group_by(OrderHistory.id, Invoice.id, OrderHistory.product_id, Product.name, Customer.name, Product.price).all()
 
+    # Memastikan query menghasilkan hasil
+    if not orders:
+        return jsonify({"error": "Orders not found for this invoice"}), 404
 
-# def get_cat():
-#     categories = Category.query.all()
+    # Memproses hasil query menjadi response yang diinginkan
+    result = []
+    for order in orders:
+        result.append({
+            "order_id": order.order_id,
+            "order_date": order.order_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "total_payment": float(order.total_payment) if order.total_payment else 0.00,
+            "invoice_id": order.invoice_id if order.invoice_id else None,
+            "product_id": order.product_id,
+            "product_name": order.product_name,
+            "product_price": float(order.product_price),  # Harga produk
+            "total_quantity": order.total_quantity
+        })
 
-#     # Hitung total produk dari semua kategori
-#     total_all_products = Product.query.count()
+    return jsonify(result)
 
-#     result = [
-#         {
-#             "id": 0,  # ID 0 atau None untuk kategori "All"
-#             "name": "All",
-#             "image_url": "logo-all-cat.svg",  # Bisa pakai default image atau None
-#             "total_products": total_all_products,
-#             "created_at": None,
-#             "updated_at": None,
-#         }
-#     ]
+def get_invoice(start_date=None, end_date=None, start_time=None, end_time=None):
+    # Mendapatkan tanggal sekarang dan mengatur default start_date dan end_date
+    date_now = datetime.datetime.now()
+    formatted_date = date_now.strftime("%Y-%m-%d")
+    # Jika start_date atau end_date None, atur ke default formatted_date
+    start_date = start_date or formatted_date
+    end_date = end_date or formatted_date
 
-#     for category in categories:
-#         result.append({
-#             "id": category.id,
-#             "name": category.name,
-#             "image_url": category.image_url,
-#             "total_products": len(category.products),
-#             "created_at": category.created_at,
-#             "updated_at": category.updated_at,
-#         })
+    # Jika start_time atau end_time None, atur ke default 00:00:00 dan 23:59:59
+    start_time = start_time or "00:00:00"
+    end_time = end_time or "23:59:59"
 
-#     return result
+    # Konversi string ke format datetime
+    start_datetime = datetime.datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M:%S")
+    end_datetime = datetime.datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M:%S")
 
-# def get_prod():
-#     products = Product.query.all()
-#     result = []
+    # Ambil invoice berdasarkan rentang tanggal
+    invoices = Invoice.query.filter(
+        Invoice.issued_at.between(start_datetime, end_datetime)
+    ).all()
 
-#     for product in products:
-#         result.append({
-#             "id": product.id,
-#             "name": product.name,
-#             "image_url": product.image_url,
-#             "price": product.price,
-#             "created_at": product.created_at,
-#             "updated_at": product.updated_at,
-#         })
-    
-#     return result
+    if not invoices:
+        return jsonify({"error": "Invoice not found"}), 404
 
+    data = {
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "result": []
+    }
+
+    # Loop untuk mengambil detail setiap invoice dan nama customer
+    for invoice in invoices:
+        # Ambil nama customer berdasarkan customer_id dari invoice
+        customer = Customer.query.filter(Customer.id == invoice.customer_id).first()
+
+        if not customer:
+            return jsonify({"error": f"Customer not found for invoice {invoice.id}"}), 404
+
+        # Buat detail invoice
+        invoice_detail = {
+            "invoice_id": invoice.id,
+            "customer_id": invoice.customer_id,
+            "customer_name": customer.name,  # Menambahkan nama customer
+            "total_price": '{:,.0f}'.format(float(invoice.total_price)).replace(',', '.'),
+            "payment_method": invoice.payment_method,
+            "payment_status": invoice.payment_status,
+            "order_status": invoice.order_status,
+            "issued_at": invoice.issued_at.strftime("%d/%m/%Y - %H.%M"),
+            "due_date": invoice.due_date.strftime("%d/%m/%Y - %H.%M") if invoice.due_date else None,
+        }
+
+        data['result'].append(invoice_detail)
+
+    return data
+
+@app.route('/create_order', methods=['POST'])
+def create_order():
+    try:
+        data = request.json
+
+        # Insert Customer
+        new_customer = Customer(
+            name=data['customer_name'],
+            contact = data.get('customer_contact', ""),
+            member_id=data.get('member_id', "")  # Opsional
+        )
+        db.session.add(new_customer)
+        db.session.flush()  # Dapatkan customer_id sebelum commit
+
+        # Insert Invoice
+        new_invoice = Invoice(
+            customer_id=new_customer.id,
+            total_price=data['total_price'],
+            payment_method=data['payment_method'],
+            payment_status=data['payment_status'],
+            order_status='pending',
+            due_date=data.get('due_date', None)
+        )
+        db.session.add(new_invoice)
+        db.session.flush()  # Dapatkan invoice_id sebelum commit
+
+        # Insert Order History (Multiple Orders)
+        orders = []
+        for item in data['orders']:
+            orders.append(OrderHistory(
+                customer_id=new_customer.id,
+                invoice_id=new_invoice.id,
+                product_id=item['product_id'],
+                quantity=item['quantity'],
+                price=item['price']
+            ))
+        db.session.add_all(orders)
+
+        db.session.commit()
+
+        return jsonify({"message": "Order berhasil dibuat!", "invoice_id": new_invoice.id}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/", methods=["GET"])
 def index():
@@ -148,6 +243,12 @@ def index():
 def stock():
     menu = get_menus()
     return render_template("stock.html", menu=menu)
+
+@app.route("/order-history", methods=['GET'])
+def order():
+    menu = get_menus()
+    history = get_invoice()
+    return render_template("order.html", menu=menu, history=history)
 
 
 if __name__ == '__main__':
