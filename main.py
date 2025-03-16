@@ -12,7 +12,7 @@ db.init_app(app)
 
 # Fungsi untuk mendapatkan data menu beserta submenunya
 def get_menus():
-    menus = Menu.query.all()  # Ambil semua data dari tabel menus
+    menus = sorted(Menu.query.all(), key=lambda menu: menu.id)  # Urutkan menu berdasarkan id
     result = []
     current_path = request.path  # Ambil URL halaman saat ini
 
@@ -27,7 +27,7 @@ def get_menus():
             "created_at": menu.created_at,
             "updated_at": menu.updated_at,
             "active": is_active,  # Tambahkan status aktif
-            "submenus": [
+            "submenus": [  # Tidak mengurutkan submenus
                 {
                     "id": submenu.id,
                     "name": submenu.name,
@@ -40,6 +40,7 @@ def get_menus():
         })
 
     return result
+
 
 def get_data():
     # Ambil semua kategori dari database
@@ -153,14 +154,14 @@ def get_invoice(start_date=None, end_date=None, start_time=None, end_time=None):
         Invoice.issued_at.between(start_datetime, end_datetime)
     ).all()
 
-    if not invoices:
-        return jsonify({"error": "Invoice not found"}), 404
-
     data = {
         "start_date": str(start_date),
         "end_date": str(end_date),
         "result": []
     }
+
+    if not invoices:
+        return data
 
     # Loop untuk mengambil detail setiap invoice dan nama customer
     for invoice in invoices:
@@ -186,6 +187,21 @@ def get_invoice(start_date=None, end_date=None, start_time=None, end_time=None):
         data['result'].append(invoice_detail)
 
     return data
+
+def get_membership():
+    result = []
+    customers = Customer.query.filter(Customer.contact != '').all()
+    
+    for customer in customers:
+        result.append({
+            "customer_id": customer.id,
+            "created_at": customer.created_at.strftime("%d/%m/%Y"),
+            "customer_name": customer.name,
+            "customer_contact": customer.contact,
+            "customer_point": customer.poin
+        })
+
+    return result
 
 @app.route('/create_order', methods=['POST'])
 def create_order():
@@ -232,6 +248,26 @@ def create_order():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 400
+    
+@app.route("/search_member", methods=["GET"])
+def search_membership():
+    query = request.args.get('query', '')
+    # Query pencarian berdasarkan nama atau kontak
+    results = Customer.query.filter(
+        (Customer.name.ilike(f'%{query}%')) | 
+        (Customer.contact.ilike(f'%{query}%'))
+    ).limit(10).all()  # Batasi hasil pencarian menjadi 10
+    
+    # Menyusun hasil pencarian dalam format JSON
+    members = [{
+        'name': result.name,
+        'contact': result.contact,
+        'poin': result.poin, 
+        'member_id': result.member_id,
+        'created_at': result.created_at.strftime('%Y-%m-%d %H:%M:%S')  # Format waktu jika perlu
+    } for result in results]
+    
+    return jsonify(members)
 
 @app.route("/", methods=["GET"])
 def index():
@@ -248,8 +284,15 @@ def stock():
 def order():
     menu = get_menus()
     history = get_invoice()
+    print(history)
     return render_template("order.html", menu=menu, history=history)
+
+@app.route("/membership", methods=["GET"])
+def membership():
+    menu = get_menus()
+    customers = get_membership()
+    return render_template("membership.html", menu=menu, customers=customers)
 
 
 if __name__ == '__main__':
-    app.run(port=9000, debug=True)
+    app.run(host="192.168.18.5", port=9000, debug=True)

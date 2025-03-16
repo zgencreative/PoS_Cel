@@ -54,48 +54,146 @@
               {{ data['payment_status'] }}
             </span>
           </td>
-          <td><a href="#" class="btn btn-sm btn-detail-order">Detail</a></td>
+          <td>
+            <a href="#" class="btn btn-sm btn-detail-order" id="openModalBtn"
+              >Detail</a
+            >
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
 
-<!-- Table Section
-<div class="row">
-  <div class="col-12">
-    <h3 class="text-center">Order History</h3>
-    <div class="table-responsive">
-      <table class="table table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Date & Time</th>
-            <th>Costumer Name</th>
-            <th>Order Status</th>
-            <th>Total Payment</th>
-            <th>Order Status</th>
-            <th>Orders</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>001</td>
-            <td>25/05/2024 - 08.00</td>
-            <td>Ajun</td>
-            <td class="status-done">Done</td>
-            <td>Rp 397.789</td>
-            <td class="status-paid">Paid</td>
-            <td><a href="#" class="btn btn-sm btn-outline-info">Detail</a></td>
-          </tr>
-        </tbody>
-      </table>
+  <div id="rightModal" class="right-modal">
+    <span class="modal-close" id="closeModalBtn">&times;</span>
+    <div class="modal-content">
+      <!-- Header -->
+      <div class="header-modal">
+        <img
+          src="{{ url_for('static', filename='img/logo.svg') }}"
+          alt="Logo"
+          class="logo"
+        />
+      </div>
+
+      <!-- Customer and Transaction Info -->
+      <div class="info">
+        <table class="table-borderless">
+          <tbody>
+            <tr>
+              <td>Costumer Name</td>
+              <td>:</td>
+              <td>John Doe</td>
+            </tr>
+            <tr>
+              <td>Date</td>
+              <td>:</td>
+              <td>12/03/2025</td>
+            </tr>
+            <tr>
+              <td>Time</td>
+              <td>:</td>
+              <td>15:30</td>
+            </tr>
+            <tr>
+              <td>Cashier</td>
+              <td>:</td>
+              <td>Jane Smith</td>
+            </tr>
+            <tr>
+              <td>Payment Method</td>
+              <td>:</td>
+              <td>QRIS</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Product List -->
+      <div class="table-product-modal">
+        <table class="table-modal">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Amount</th>
+              <th>Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lidah Kucing</td>
+              <td>1</td>
+              <td>Rp. 30.379</td>
+            </tr>
+            <tr>
+              <td>Banana Cake</td>
+              <td>2</td>
+              <td>Rp. 60.758</td>
+            </tr>
+            <tr>
+              <td>Roti Keju</td>
+              <td>1</td>
+              <td>Rp. 30.379</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Total and Tax Info -->
+      <div class="total-info">
+        <hr />
+        <table class="right-aligned-table">
+          <tbody>
+            <tr>
+              <td>Sub Total</td>
+              <td>:</td>
+              <td>Rp. 30.379</td>
+            </tr>
+            <tr>
+              <td>Tax</td>
+              <td>:</td>
+              <td>Rp. 30.379</td>
+            </tr>
+            <tr>
+              <td>Cashback</td>
+              <td>:</td>
+              <td>Rp. 0</td>
+            </tr>
+            <tr>
+              <td><strong>Total Bill<strong></td>
+              <td>:</td>
+              <td><strong>Rp. 30.379</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
--->
 {% endblock %} {% block extra_js %}
+<script>
+  const openModalBtn = document.getElementById("openModalBtn");
+  const closeModalBtn = document.getElementById("closeModalBtn");
+  const rightModal = document.getElementById("rightModal");
+  const okBtn = document.getElementById("okBtn");
+
+  // Menampilkan modal
+  openModalBtn.addEventListener("click", () => {
+    rightModal.classList.add("show");
+  });
+
+  // Menutup modal
+  closeModalBtn.addEventListener("click", () => {
+    rightModal.classList.remove("show");
+  });
+
+  // Tombol OK di dalam modal
+  okBtn.addEventListener("click", () => {
+    // Refresh halaman atau aksi lain yang diinginkan
+    location.reload();
+  });
+</script>
 <script>
   const dateNow = new Date();
 

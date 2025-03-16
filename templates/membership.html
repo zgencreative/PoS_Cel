@@ -1,0 +1,109 @@
+{% include 'templates.html' %} {% block content %}
+<div class="second-content">
+  <div
+    class="d-flex align-items-center justify-content-between ms-5 me-5 mt-3 mb-3"
+  >
+    <span class="add-member-text">Membership List</span>
+    <button class="add-member-btn" id="openMemberModal">
+      Add New Member
+      <img
+        src="{{ url_for('static', filename='img/plus.svg') }}"
+        alt="Add Member"
+      />
+    </button>
+  </div>
+
+  <div id="member-modal" class="member-modal">
+    <div class="member-modal-content">
+      <span class="close-btn">&times;</span>
+      <span class="add-member-text">Add Membership</span>
+      <form class="membership-form">
+        <table>
+          <tr>
+            <td>
+              <label for="name">Name <span class="required">*</span></label>
+            </td>
+            <td>
+              <input type="text" id="name" name="name" required />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="phone"
+                >Phone Number <span class="required">*</span></label
+              >
+            </td>
+            <td>
+              <input type="tel" id="phone" name="phone" required />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="date">Date <span class="required">*</span></label>
+            </td>
+            <td><input type="date" id="date" name="date" required /></td>
+          </tr>
+        </table>
+
+        <button type="submit" class="add-btn-member">
+          Add Membership
+          <img src="{{ url_for('static', filename='img/plus-pink.svg') }}" />
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="ms-4 me-4">
+    <table class="table-member">
+      <thead class="text-center">
+        <tr>
+          <th>#</th>
+          <th>Date Join Membership</th>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>Point</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody class="text-center">
+        {% for data in customers %}
+        <tr>
+          <td>{{ "{:03d}".format(loop.index) }}</td>
+          <td>{{data['created_at']}}</td>
+          <td>{{data['customer_name']}}</td>
+          <td>{{data['customer_contact']}}</td>
+          <td>{{data['customer_point']}}</td>
+          <td>
+            <button class="btn-edit">
+              <img src="{{ url_for('static', filename='img/edit.svg') }}" />
+            </button>
+            <button class="btn-delete">
+              <img src="{{ url_for('static', filename='img/trash.svg') }}" />
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  // Menampilkan modal saat tombol diklik
+  document.getElementById("openMemberModal").onclick = function () {
+    document.getElementById("member-modal").style.display = "block";
+  };
+
+  // Menutup modal saat tombol X diklik
+  document.getElementsByClassName("close-btn")[0].onclick = function () {
+    document.getElementById("member-modal").style.display = "none";
+  };
+
+  // Menutup modal jika klik di luar konten modal
+  window.onclick = function (event) {
+    if (event.target == document.getElementById("member-modal")) {
+      document.getElementById("member-modal").style.display = "none";
+    }
+  };
+</script>
+{% endblock %}

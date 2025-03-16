@@ -15,6 +15,7 @@ class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
     contact = db.Column(db.String(50), nullable=False)
+    poin = db.Column(db.Integer, nullable=False, server_default="0")
     member_id = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.TIMESTAMP, server_default=func.now())
 
