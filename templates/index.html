@@ -91,6 +91,7 @@
         <!-- Card/Debit -->
         <div
           class="payment-option"
+          id="debit"
           onclick="selectPayment(this, 'Card/Debit Card')"
         >
           <img
@@ -102,7 +103,11 @@
         </div>
 
         <!-- QR Code -->
-        <div class="payment-option" onclick="selectPayment(this, 'QR Code')">
+        <div
+          class="payment-option"
+          id="qr-code"
+          onclick="selectPayment(this, 'QR Code')"
+        >
           <img
             src="{{ url_for('static', filename='img/qr-pay.svg') }}"
             alt="QR Code"
@@ -120,7 +125,17 @@
     </div>
   </div>
 </div>
-{% endblock %} {% block extra_js %}
+{% endblock %} {% block extra_js %}\
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+<script>
+  // Membuat koneksi ke server menggunakan Socket.IO
+  const socket = io.connect("http://192.168.18.5:9000/"); // Ganti URL dengan alamat server Anda
+
+  // Pastikan koneksi telah terbentuk sebelum mengirim data
+  socket.on("connect", function () {
+    console.log("Koneksi Socket.IO berhasil");
+  });
+</script>
 <script>
   // Mengambil elemen input pencarian dan hasil pencarian
   const searchInput = document.getElementById("searchMember");
@@ -194,7 +209,6 @@
     }
   });
 </script>
-
 <script>
   function getActiveCategoryId() {
     const activeCategory = document.querySelector(".category-card.active");
@@ -250,8 +264,10 @@
                 }
             </div>`;
     });
+    socket.emit("filter_products_by_search", { searchQuery });
   }
   function selectPayment(element, paymentMethod) {
+    const elementsId = element.id;
     // Hilangkan kelas "active" dari semua opsi
     document.querySelectorAll(".payment-option").forEach((option) => {
       option.classList.remove("active");
@@ -262,6 +278,10 @@
 
     // Simpan pilihan di input hidden
     document.getElementById("selectedPayment").value = paymentMethod;
+    socket.emit("update_payment", {
+      element: elementsId,
+      payment_method: paymentMethod,
+    });
   }
   function editCustomerName() {
     // Ambil elemen
@@ -282,8 +302,7 @@
     if (inputElement.value.trim() !== "") {
       textElement.innerHTML = `${inputElement.value} <img
             class="member-icon"
-            src="{{ url_for('static',
-          filename='img/logo-member.svg') }}"
+            src="{{ url_for('static', filename='img/logo-member.svg') }}"
             id="member"
         />`;
     }
@@ -291,6 +310,11 @@
     // Tampilkan teks kembali, sembunyikan input
     textElement.classList.remove("d-none");
     inputElement.classList.add("d-none");
+
+    // Kirim nama pelanggan yang baru ke server menggunakan Socket.IO
+    socket.emit("update_customer_name", {
+      customer_name: inputElement.value.trim(),
+    });
   }
 
   function handleKeyPress(event) {
@@ -309,56 +333,63 @@
     }
 
     function filterProducts(categoryId) {
-        const productContainer = document.getElementById("product-container");
-        productContainer.innerHTML = "";
+      const productContainer = document.getElementById("product-container");
+      productContainer.innerHTML = "";  // Kosongkan kontainer produk
 
-        const selectedProducts = allProducts[categoryId] || [];
+      const selectedProducts = allProducts[categoryId] || [];  // Ambil produk sesuai kategori
 
-        selectedProducts.forEach(product => {
-            const quantity = cart[product.name]?.quantity || 0;
+      // Tampilkan produk sesuai kategori yang dipilih
+      selectedProducts.forEach(product => {
+          const quantity = cart[product.name]?.quantity || 0;
 
-            productContainer.innerHTML += `
-                <div class="product-card">
-                    <img src="/static/img/${product.image_url}" alt="${product.name}" />
-                    <div class="product-info">
-                        <h5>${product.name}</h5>
-                        <p>Rp. ${parseInt(product.price).toLocaleString("id-ID").replace(/,/g, ".")}</p>
-                    </div>
-                    ${
-                        quantity > 0
-                            ? `<div class="counter">
-                                  <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
-                                  <span class="quantity">${quantity}</span>
-                                  <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
-                               </div>`
-                            : `<div class="add-btn"
-                                  data-id="${product.id}"
-                                  data-name="${product.name}"
-                                  data-price="${product.price}"
-                                  data-image="${product.image_url}"
-                                  data-category="${categoryId}">
-                                  Add to Dish
-                               </div>`
-                    }
-                </div>`;
-        });
+          productContainer.innerHTML += `
+              <div class="product-card">
+                  <img src="/static/img/${product.image_url}" alt="${product.name}" />
+                  <div class="product-info">
+                      <h5>${product.name}</h5>
+                      <p>Rp. ${parseInt(product.price).toLocaleString("id-ID").replace(/,/g, ".")}</p>
+                  </div>
+                  ${
+                      quantity > 0
+                          ? `<div class="counter">
+                                <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
+                                <span class="quantity">${quantity}</span>
+                                <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
+                             </div>`
+                          : `<div class="add-btn"
+                                data-id="${product.id}"
+                                data-name="${product.name}"
+                                data-price="${product.price}"
+                                data-image="${product.image_url}"
+                                data-category="${categoryId}">
+                                Add to Dish
+                             </div>`
+                  }
+              </div>`;
+      });
 
-        document.querySelectorAll(".category-card").forEach(el => {
+      // Hapus kelas "active" dari semua kategori
+      document.querySelectorAll(".category-card").forEach(el => {
           el.classList.remove("active");
-          // Kembalikan gambar ke default jika tidak aktif
           const img = el.querySelector("img");
-          img.src = img.getAttribute("data-default");
-        });
-        // Tambahkan class active ke kategori yang dipilih
-        const activeCard = document.getElementById(`cat-${categoryId}`);
-        activeCard.classList.add("active");
+          img.src = img.getAttribute("data-default");  // Kembalikan gambar default
+      });
 
-        // Ubah gambar ke hover_image_url saat aktif
-        const activeImg = activeCard.querySelector("img");
-        activeImg.src = activeImg.getAttribute("data-hover");
+      // Tambahkan kelas "active" ke kategori yang dipilih
+      const activeCard = document.getElementById(`cat-${categoryId}`);
+      activeCard.classList.add("active");
 
-        updateOrderList();
-    }
+      // Ubah gambar ke hover_image_url saat aktif
+      const activeImg = activeCard.querySelector("img");
+      activeImg.src = activeImg.getAttribute("data-hover");
+
+      // Kirim pembaruan kategori yang dipilih ke server menggunakan Socket.IO
+      socket.emit("filter_products", { category_id: categoryId });
+
+      // Update daftar order (keranjang)
+      updateOrderList();
+  }
+
 
     function showNotification() {
       toastr.options = {
@@ -491,48 +522,50 @@
     });
 
     function updateOrderList() {
-        const orderList = document.querySelector(".order-list");
-        orderList.innerHTML = "";
+      const orderList = document.querySelector(".order-list");
+      orderList.innerHTML = "";
 
-        let totalPrice = 0;
+      let totalPrice = 0;
 
-        Object.keys(cart).forEach(name => {
-            const item = cart[name];
-            const totalItemPrice = item.price * item.quantity;
-            totalPrice += totalItemPrice;
+      Object.keys(cart).forEach(name => {
+          const item = cart[name];
+          const totalItemPrice = item.price * item.quantity;
+          totalPrice += totalItemPrice;
 
-            orderList.innerHTML += `
-                <div class="order-item d-flex align-items-start">
-                    <img src="/static/img/${item.image}" alt="${name}" />
-                    <div class="flex-grow-1 d-flex flex-column gap-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <b class="order-title">${name}</b>
-                            <small class="text-muted">Rp. ${item.price.toLocaleString("id-ID").replace(/,/g, ".")}</small>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-end">
-                            <small>${item.quantity}x</small>
-                            <strong class="price">Rp. ${totalItemPrice.toLocaleString("id-ID").replace(/,/g, ".")}</strong>
-                        </div>
-                    </div>
-                </div>`;
-        });
+          orderList.innerHTML += `
+              <div class="order-item d-flex align-items-start">
+                  <img src="/static/img/${item.image}" alt="${name}" />
+                  <div class="flex-grow-1 d-flex flex-column gap-2">
+                      <div class="d-flex justify-content-between align-items-start">
+                          <b class="order-title">${name}</b>
+                          <small class="text-muted">Rp. ${item.price.toLocaleString("id-ID").replace(/,/g, ".")}</small>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-end">
+                          <small>${item.quantity}x</small>
+                          <strong class="price">Rp. ${totalItemPrice.toLocaleString("id-ID").replace(/,/g, ".")}</strong>
+                      </div>
+                  </div>
+              </div>`;
+      });
 
-        if (totalPrice > 0) {
+      if (totalPrice > 0) {
           const subtotal = document.getElementById("subtotal");
           const totalam = document.getElementById("totalamount");
           const total_price = document.getElementById("totalPrice");
           total_price.value = totalPrice;
           subtotal.textContent = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
           totalam.innerHTML = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
-        } else {
-            const subtotal = document.getElementById("subtotal");
-            const totalam = document.getElementById("totalamount");
-            const total_price = document.getElementById("totalPrice");
-            total_price.value = totalPrice;
-            subtotal.textContent = "Rp. 0";
-            totalam.innerHTML = "Rp. 0";
-        }
+      } else {
+          const subtotal = document.getElementById("subtotal");
+          const totalam = document.getElementById("totalamount");
+          const total_price = document.getElementById("totalPrice");
+          total_price.value = totalPrice;
+          subtotal.textContent = "Rp. 0";
+          totalam.innerHTML = "Rp. 0";
+      }
 
-    }
+      // Kirim data keranjang yang diperbarui ke server menggunakan Socket.IO
+      socket.emit('update_cart', { cart: cart, total_price: totalPrice });
+  }
 </script>
 {% endblock %}

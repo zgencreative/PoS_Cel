@@ -1,8 +1,10 @@
 from flask import Flask, render_template, url_for, redirect, request, jsonify
+from flask_socketio import SocketIO, emit
 from models import db, Menu, Submenu, Category, Product, OrderHistory, Invoice, Customer
 import datetime
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # Ganti dengan informasi PostgreSQL-mu
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:root@localhost:5432/pos_celevo'
@@ -142,8 +144,12 @@ def get_invoice(start_date=None, end_date=None, start_time=None, end_time=None):
     end_date = end_date or formatted_date
 
     # Jika start_time atau end_time None, atur ke default 00:00:00 dan 23:59:59
-    start_time = start_time or "00:00:00"
-    end_time = end_time or "23:59:59"
+    start_time = start_time or "00:00"
+    end_time = end_time or "23:59"
+
+    # Menambahkan detik ke waktu (format jam:menit menjadi jam:menit:detik)
+    start_time = f"{start_time}:00"
+    end_time = f"{end_time}:00"
 
     # Konversi string ke format datetime
     start_datetime = datetime.datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M:%S")
@@ -275,16 +281,30 @@ def index():
     data = get_data()
     return render_template("index.html", menu=menu, data=data)
 
+@app.route("/customer", methods=["GET"])
+def customer():
+    menu = get_menus()
+    data = get_data()
+    return render_template("customer.html", menu=menu, data=data)
+
 @app.route("/stock-management", methods=['GET'])
 def stock():
     menu = get_menus()
     return render_template("stock.html", menu=menu)
 
-@app.route("/order-history", methods=['GET'])
+@app.route("/order-history", methods=['GET', 'POST'])
 def order():
     menu = get_menus()
-    history = get_invoice()
-    print(history)
+    if request.method == "POST":
+        data = request.get_json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        history = get_invoice(start_date, end_date, start_time, end_time)
+        return jsonify(history)
+    
+    history = get_invoice()    
     return render_template("order.html", menu=menu, history=history)
 
 @app.route("/membership", methods=["GET"])
@@ -293,6 +313,36 @@ def membership():
     customers = get_membership()
     return render_template("membership.html", menu=menu, customers=customers)
 
+@socketio.on('update_cart')
+def handle_update_cart(data):
+    # Kirim pembaruan cart ke semua klien yang terhubung
+    emit('cart_update', {'cart': data['cart'], 'total_price': data['total_price']}, broadcast=True)
+
+@socketio.on('update_payment')
+def handle_update_payment(data):
+    # Kirim pembaruan cart ke semua klien yang terhubung
+    emit('payment_update', {'element': data['element'], 'payment_method': data['payment_method']}, broadcast=True)
+
+@socketio.on('update_customer_name')
+def handle_update_customer_name(data):
+    current_customer_name = data['customer_name']
+    # Kirim pembaruan nama pelanggan ke semua klien
+    emit('customer_name_updated', {'customer_name': current_customer_name}, broadcast=True)
+
+@socketio.on('filter_products')
+def handle_filter_products(data):
+    category_id = data['category_id']
+    
+    # Mengirim produk yang difilter ke semua klien
+    emit('products_filtered', {'category_id': category_id}, broadcast=True)
+
+@socketio.on('filter_products_by_search')
+def handle_filter_products_by_search(data):
+    search_query = data['searchQuery'].lower()
+    
+    # Kirim produk yang sudah difilter kembali ke klien
+    emit('products_filtered_by_search', {'searchQuery': search_query}, broadcast=True)
+
 
 if __name__ == '__main__':
-    app.run(host="192.168.18.5", port=9000, debug=True)
+    socketio.run(app, host="192.168.18.5", port=9000, debug=True)

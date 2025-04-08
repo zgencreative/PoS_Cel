@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Celevo</title>
+    <link
+      href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='css/styles.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="icon"
+      href="{{ url_for('static', filename='img/favicon.ico') }}"
+      type="image/x-icon"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css"
+    />
+  </head>
+  <body>
+    <!-- Konten Tengah -->
+    <div class="main-content">
+      <div class="text-center">
+        <input
+          type="text"
+          class="search-bar"
+          id="search-input"
+          placeholder="Search Product here..."
+          oninput="filterProductsBySearch()"
+        />
+      </div>
+
+      <!-- Category Menu -->
+      <div class="category-container">
+        {% for cat in data.categories %}
+        <div
+          class="category-card"
+          onclick="filterProducts({{ cat['id'] }})"
+          id="cat-{{ cat['id'] }}"
+        >
+          <img
+            src=""
+            alt="{{ cat['name'] }}"
+            data-default="{{ url_for('static', filename='img/' + cat['image_url']) }}"
+            data-hover="{{ url_for('static', filename='img/' + cat['hover_image_url']) }}"
+          />
+          <div class="category-info">
+            <h4>{{ cat['name'] }}</h4>
+            <p>{{ cat['total_products'] }} items</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Product Grid -->
+      <div class="product-grid" id="product-container"></div>
+
+      <div class="sidebar-right">
+        <!-- Customer Name -->
+        <div>
+          <h5 class="d-flex justify-content-between align-items-center">
+            <b id="customerNameText">Customer Name</b>
+            <input
+              type="text"
+              id="customerNameInput"
+              class="form-control d-none"
+              value="Customer Name"
+              onblur="saveCustomerName()"
+              onkeydown="handleKeyPress(event)"
+            />
+            <img
+              src="{{ url_for('static', filename='img/logo-edit.svg') }}"
+              alt="Edit"
+              width="20"
+              style="cursor: pointer"
+              onclick="editCustomerName()"
+            />
+          </h5>
+
+          <hr class="custom-garis" />
+          <div class="container-member">
+            <!-- Search Input -->
+            <input
+              type="text"
+              class="search-input-member"
+              placeholder="find membership..."
+              id="searchMember"
+            />
+          </div>
+
+          <div id="searchResults" class="search-results"></div>
+
+          <div class="order-list"></div>
+        </div>
+
+        <!-- Order Summary -->
+        <div>
+          <div class="order-summary">
+            <p>Sub Total <span class="float-end" id="subtotal"></span></p>
+            <p>Tax<span class="float-end">Rp. 0</span></p>
+            <hr />
+            <h5>
+              <b>Total Amount</b>
+              <span class="float-end" id="totalamount"></span>
+            </h5>
+          </div>
+
+          <!-- Payment Methods -->
+          <div class="d-flex justify-content-center gap-3">
+            <!-- Card/Debit -->
+            <div
+              class="payment-option"
+              id="debit"
+              onclick="selectPayment(this, 'Card/Debit Card')"
+            >
+              <img
+                src="{{ url_for('static', filename='img/debit-pay.svg') }}"
+                alt="Card"
+                class="payment-img"
+              />
+              <p class="mt-2 mb-0">Card/Debit Card</p>
+            </div>
+
+            <!-- QR Code -->
+            <div
+              class="payment-option"
+              id="qr-code"
+              onclick="selectPayment(this, 'QR Code')"
+            >
+              <img
+                src="{{ url_for('static', filename='img/qr-pay.svg') }}"
+                alt="QR Code"
+                class="payment-img"
+              />
+              <p class="mt-2 mb-0">QR Code</p>
+            </div>
+          </div>
+
+          <input type="hidden" id="selectedPayment" name="payment_method" />
+          <input type="hidden" id="totalPrice" name="total_price" />
+
+          <!-- Place Order Button -->
+          <button class="btn-order mt-3" onclick="placeOrder()">
+            Place Order
+          </button>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+      // Membuat koneksi ke server menggunakan Socket.IO
+      const socket = io.connect("http://192.168.18.5:9000/"); // Ganti URL dengan alamat server Anda
+
+      // Pastikan koneksi telah terbentuk sebelum mengirim data
+      socket.on("connect", function () {
+        console.log("Koneksi Socket.IO berhasil");
+      });
+    </script>
+    <script>
+      // Mengambil elemen input pencarian dan hasil pencarian
+      const searchInput = document.getElementById("searchMember");
+      const searchResults = document.getElementById("searchResults");
+      let textElement = document.getElementById("customerNameText");
+
+      // Event listener untuk mendeteksi inputan pada kolom pencarian
+      searchInput.addEventListener("input", async function () {
+        const query = searchInput.value.trim();
+
+        if (query.length >= 2) {
+          // Mulai pencarian setelah 2 karakter
+          try {
+            // Fetch data dari backend Flask menggunakan Fetch API
+            const response = await fetch(`/search_member?query=${query}`);
+            const data = await response.json();
+
+            // Menampilkan hasil pencarian
+            if (data.length > 0) {
+              let html = "";
+              data.forEach((result) => {
+                html += `<div class="result-item" data-id="${result.id}">
+                        <div class="cust-name">
+                          <strong>${result.name}</strong><br>
+                          ${result.contact}0822
+                        </div>
+                        <span>${result.poin}</span>
+                    </div>`;
+              });
+              searchResults.innerHTML = html;
+              searchResults.style.display = "block";
+            } else {
+              searchResults.innerHTML = "<div>No results found</div>";
+              searchResults.style.display = "block";
+            }
+          } catch (error) {
+            console.error("Error fetching search results:", error);
+          }
+        } else {
+          searchResults.style.display = "none"; // Sembunyikan hasil pencarian jika kurang dari 2 karakter
+        }
+      });
+
+      // Menutup hasil pencarian jika pengguna mengklik di luar area pencarian
+      document.addEventListener("click", function (event) {
+        if (
+          !searchInput.contains(event.target) &&
+          !searchResults.contains(event.target)
+        ) {
+          searchResults.style.display = "none";
+        }
+      });
+
+      // Event listener untuk memilih hasil pencarian
+      searchResults.addEventListener("click", function (event) {
+        const selectedItem = event.target.closest(".result-item");
+
+        if (selectedItem) {
+          const userId = selectedItem.getAttribute("data-id");
+          const userName =
+            selectedItem.querySelector(".cust-name strong").textContent;
+
+          textElement.innerHTML = `${userName} <img
+              class="member-icon"
+              src="{{ url_for('static', filename='img/logo-member.svg') }}"
+              id="member"
+          />`;
+
+          // Menutup hasil pencarian setelah memilih
+          searchResults.style.display = "none";
+        }
+      });
+    </script>
+
+    <script>
+      function getActiveCategoryId() {
+        const activeCategory = document.querySelector(".category-card.active");
+        return activeCategory
+          ? parseInt(activeCategory.getAttribute("id").split("-")[1])
+          : null;
+      }
+      function filterProductsBySearch() {
+        const searchQuery = document
+          .getElementById("search-input")
+          .value.toLowerCase(); // Ambil input pencarian
+        const categoryId = getActiveCategoryId(); // Dapatkan kategori yang aktif
+
+        const selectedProducts = allProducts[categoryId] || []; // Ambil produk berdasarkan kategori
+
+        const filteredProducts = selectedProducts.filter((product) => {
+          return product.name.toLowerCase().includes(searchQuery); // Filter produk berdasarkan nama
+        });
+
+        const productContainer = document.getElementById("product-container");
+        productContainer.innerHTML = ""; // Reset produk yang ditampilkan
+
+        // Menampilkan produk yang sudah difilter
+        filteredProducts.forEach((product) => {
+          const quantity = cart[product.name]?.quantity || 0;
+
+          productContainer.innerHTML += `
+            <div class="product-card">
+                <img src="/static/img/${product.image_url}" alt="${
+            product.name
+          }" />
+                <div class="product-info">
+                    <h5>${product.name}</h5>
+                    <p>Rp. ${parseInt(product.price)
+                      .toLocaleString("id-ID")
+                      .replace(/,/g, ".")}</p>
+                </div>
+                ${
+                  quantity > 0
+                    ? `<div class="counter">
+                              <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
+                              <span class="quantity">${quantity}</span>
+                              <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
+                           </div>`
+                    : `<div class="add-btn"
+                              data-id="${product.id}"
+                              data-name="${product.name}"
+                              data-price="${product.price}"
+                              data-image="${product.image_url}"
+                              data-category="${categoryId}">
+                              Add to Dish
+                           </div>`
+                }
+            </div>`;
+        });
+      }
+      function selectPayment(element, paymentMethod) {
+        // Hilangkan kelas "active" dari semua opsi
+        document.querySelectorAll(".payment-option").forEach((option) => {
+          option.classList.remove("active");
+        });
+
+        // Tambahkan kelas "active" ke opsi yang dipilih
+        element.classList.add("active");
+
+        // Simpan pilihan di input hidden
+        document.getElementById("selectedPayment").value = paymentMethod;
+      }
+      function editCustomerName() {
+        // Ambil elemen
+        let textElement = document.getElementById("customerNameText");
+        let inputElement = document.getElementById("customerNameInput");
+
+        // Sembunyikan teks, tampilkan input
+        textElement.classList.add("d-none");
+        inputElement.classList.remove("d-none");
+        inputElement.focus();
+      }
+
+      function saveCustomerName() {
+        let textElement = document.getElementById("customerNameText");
+        let inputElement = document.getElementById("customerNameInput");
+
+        // Jika input tidak kosong, ubah teksnya
+        if (inputElement.value.trim() !== "") {
+          textElement.innerHTML = `${inputElement.value} <img
+            class="member-icon"
+            src="{{ url_for('static',
+          filename='img/logo-member.svg') }}"
+            id="member"
+        />`;
+        }
+
+        // Tampilkan teks kembali, sembunyikan input
+        textElement.classList.remove("d-none");
+        inputElement.classList.add("d-none");
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          saveCustomerName();
+        }
+      }
+    </script>
+    <script>
+          const allProducts = {{ data.products | tojson }};  // Produk dikirim dari backend
+          let cart = {}; // Objek untuk menyimpan belanjaan
+          const member = {};
+
+          function changeImage(element, newSrc) {
+            element.querySelector("img").src = newSrc;
+          }
+
+          function filterProducts(categoryId) {
+              const productContainer = document.getElementById("product-container");
+              productContainer.innerHTML = "";
+
+              const selectedProducts = allProducts[categoryId] || [];
+
+              selectedProducts.forEach(product => {
+                  const quantity = cart[product.name]?.quantity || 0;
+
+                  productContainer.innerHTML += `
+                      <div class="product-card">
+                          <img src="/static/img/${product.image_url}" alt="${product.name}" />
+                          <div class="product-info">
+                              <h5>${product.name}</h5>
+                              <p>Rp. ${parseInt(product.price).toLocaleString("id-ID").replace(/,/g, ".")}</p>
+                          </div>
+                          ${
+                              quantity > 0
+                                  ? `<div class="counter">
+                                        <button class="decrease" data-name="${product.name}" data-category="${categoryId}">-</button>
+                                        <span class="quantity">${quantity}</span>
+                                        <button class="increase" data-name="${product.name}" data-category="${categoryId}">+</button>
+                                     </div>`
+                                  : `<div class="add-btn"
+                                        data-id="${product.id}"
+                                        data-name="${product.name}"
+                                        data-price="${product.price}"
+                                        data-image="${product.image_url}"
+                                        data-category="${categoryId}">
+                                        Add to Dish
+                                     </div>`
+                          }
+                      </div>`;
+              });
+
+              document.querySelectorAll(".category-card").forEach(el => {
+                el.classList.remove("active");
+                // Kembalikan gambar ke default jika tidak aktif
+                const img = el.querySelector("img");
+                img.src = img.getAttribute("data-default");
+              });
+              // Tambahkan class active ke kategori yang dipilih
+              const activeCard = document.getElementById(`cat-${categoryId}`);
+              activeCard.classList.add("active");
+
+              // Ubah gambar ke hover_image_url saat aktif
+              const activeImg = activeCard.querySelector("img");
+              activeImg.src = activeImg.getAttribute("data-hover");
+
+              updateOrderList();
+          }
+
+          function showNotification() {
+            toastr.options = {
+              "closeButton": true,
+              "positionClass": "toast-center-center",  // Posisi notifikasi di tengah layar
+              "timeOut": "5000",    // Durasi tampil
+              "extendedTimeOut": "1000"  // Durasi tambahan setelah hover
+            };
+
+            // Menampilkan notifikasi dengan gambar dan teks
+            toastr.info(
+              '<img src="static/img/success.svg" alt="Success Icon" /> Order Successful✨'
+            );
+          }
+
+          async function placeOrder() {
+            // Cek apakah cart kosong
+            if (Object.keys(cart).length === 0) {
+                alert("Cart is empty! Please add items before placing an order.");
+                return;
+            }
+
+            // Ambil data dari form
+            const custName = document.getElementById("customerNameText").innerText;
+            const payment = document.getElementById("selectedPayment").value;
+            const total = document.getElementById("totalPrice").value;
+
+            // Format isi cart untuk dikirim ke backend
+            const orderItems = Object.keys(cart).map(name => ({
+                product_id: cart[name].id,
+                quantity: cart[name].quantity,
+                price: cart[name].price
+            }));
+
+            // Data yang akan dikirim ke API Flask
+            const orderData = {
+                customer_name: custName,
+                customer_contact: "",
+                member_id: "",
+                total_price: total,
+                payment_method: payment,
+                payment_status: "pending", // Bisa disesuaikan
+                due_date: null, // Bisa disesuaikan jika ada jatuh tempo
+                orders: orderItems
+            };
+
+            try {
+                // Kirim data ke API Flask
+                const response = await fetch("/create_order", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(orderData)
+                });
+
+                // Ambil response dari server
+                const result = await response.json();
+
+                if (response.ok) {
+                  showNotification();
+                } else {
+                    alert(`Gagal membuat order: ${result.error}`);
+                }
+
+            } catch (error) {
+                console.error("Error placing order:", error);
+            }
+          }
+
+
+          // Menambahkan event listener untuk hover
+          document.querySelectorAll(".category-card").forEach(card => {
+            const img = card.querySelector("img");
+
+            card.addEventListener("mouseover", function () {
+                if (!this.classList.contains("active")) {
+                    img.src = img.getAttribute("data-hover");
+                }
+            });
+
+            card.addEventListener("mouseout", function () {
+                if (!this.classList.contains("active")) {
+                    img.src = img.getAttribute("data-default");
+                }
+            });
+          });
+
+          // Pilih kategori "All" saat halaman pertama kali dimuat
+          document.addEventListener("DOMContentLoaded", function () {
+              filterProducts(0);
+          });
+
+          // Event delegation untuk Add to Dish
+          document.getElementById("product-container").addEventListener("click", function (e) {
+              if (e.target.classList.contains("add-btn")) {
+                  const id = e.target.dataset.id;
+                  const name = e.target.dataset.name;
+                  const price = parseFloat(e.target.dataset.price);
+                  const image = e.target.dataset.image;
+
+                  if (!cart[name]) {
+                      cart[name] = { id, quantity: 1, price, image };
+                  }
+
+                  filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+                  updateOrderList();
+              }
+          });
+
+          // Event delegation untuk increase dan decrease
+          document.getElementById("product-container").addEventListener("click", function (e) {
+              if (e.target.classList.contains("increase")) {
+                  const name = e.target.dataset.name;
+                  cart[name].quantity += 1;
+                  updateOrderList();
+                  filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+              }
+
+              if (e.target.classList.contains("decrease")) {
+                  const name = e.target.dataset.name;
+                  if (cart[name].quantity > 1) {
+                      cart[name].quantity -= 1;
+                  } else {
+                      delete cart[name];
+                  }
+                  updateOrderList();
+                  filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+              }
+          });
+
+          function updateOrderList() {
+            const orderList = document.querySelector(".order-list");
+            orderList.innerHTML = "";
+
+            let totalPrice = 0;
+
+            Object.keys(cart).forEach(name => {
+                const item = cart[name];
+                const totalItemPrice = item.price * item.quantity;
+                totalPrice += totalItemPrice;
+
+                orderList.innerHTML += `
+                    <div class="order-item d-flex align-items-start">
+                        <img src="/static/img/${item.image}" alt="${name}" />
+                        <div class="flex-grow-1 d-flex flex-column gap-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <b class="order-title">${name}</b>
+                                <small class="text-muted">Rp. ${item.price.toLocaleString("id-ID").replace(/,/g, ".")}</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-end">
+                                <small>${item.quantity}x</small>
+                                <strong class="price">Rp. ${totalItemPrice.toLocaleString("id-ID").replace(/,/g, ".")}</strong>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            if (totalPrice > 0) {
+                const subtotal = document.getElementById("subtotal");
+                const totalam = document.getElementById("totalamount");
+                const total_price = document.getElementById("totalPrice");
+                total_price.value = totalPrice;
+                subtotal.textContent = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
+                totalam.innerHTML = `Rp. ${totalPrice.toLocaleString("id-ID").replace(/,/g, ".")}`;
+            } else {
+                const subtotal = document.getElementById("subtotal");
+                const totalam = document.getElementById("totalamount");
+                const total_price = document.getElementById("totalPrice");
+                total_price.value = totalPrice;
+                subtotal.textContent = "Rp. 0";
+                totalam.innerHTML = "Rp. 0";
+            }
+        }
+
+        socket.on('cart_update', function(data) {
+          cart = data.cart;
+
+          console.log('Update cart diterima:', cart);
+
+          updateOrderList();
+          filterProducts(document.querySelector(".category-card.active").id.replace("cat-", ""));
+        });
+
+        socket.on('payment_update', function(data) {
+            console.log(data.element);
+            const element = document.getElementById(data.element);
+            const paymentMethod = data.payment_method;
+            selectPayment(element, paymentMethod);
+        });
+
+        // Mendengarkan event 'customer_name_updated' untuk mendapatkan pembaruan nama pelanggan
+      socket.on('customer_name_updated', function(data) {
+        console.log(data);
+        let textElement = document.getElementById("customerNameInput");
+        textElement.value = data.customer_name;
+        saveCustomerName();
+      });
+
+      socket.on('products_filtered', function(data) {
+        const categoryId = data.category_id;
+        filterProducts(categoryId);
+      });
+
+      socket.on('products_filtered_by_search', function(data) {
+        const query = data.searchQuery;
+        document.getElementById("search-input").value = query;
+        filterProductsBySearch();
+      });
+    </script>
+  </body>
+</html>

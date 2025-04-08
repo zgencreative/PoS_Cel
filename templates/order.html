@@ -173,26 +173,94 @@
 </div>
 {% endblock %} {% block extra_js %}
 <script>
-  const openModalBtn = document.getElementById("openModalBtn");
-  const closeModalBtn = document.getElementById("closeModalBtn");
-  const rightModal = document.getElementById("rightModal");
-  const okBtn = document.getElementById("okBtn");
-
-  // Menampilkan modal
-  openModalBtn.addEventListener("click", () => {
-    rightModal.classList.add("show");
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".filter-input").forEach((input) => {
+      input.addEventListener("change", handleFilterChange);
+    });
   });
-
-  // Menutup modal
-  closeModalBtn.addEventListener("click", () => {
-    rightModal.classList.remove("show");
+  
+  function handleFilterChange() {
+    const startDate = document.querySelector("input[type='date']").value;
+    const endDate = document.querySelectorAll("input[type='date']")[1].value;
+    const startTime = document.querySelector("input[type='time']").value;
+    const endTime = document.querySelectorAll("input[type='time']")[1].value;
+  
+    const requestData = {
+      start_date: startDate,
+      end_date: endDate,
+      start_time: startTime,
+      end_time: endTime,
+    };
+  
+    fetch("/order-history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        updateTable(data.result); // Memperbarui tabel dengan data baru
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+      });
+  }
+  
+  function updateTable(results) {
+    const tbody = document.querySelector("tbody.text-center");
+    tbody.innerHTML = ""; // Kosongkan tabel sebelum mengisi data baru
+  
+    if (results.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7">No data found</td></tr>`;
+      return;
+    }
+  
+    results.forEach((data, index) => {
+      const row = document.createElement("tr");
+  
+      row.innerHTML = `
+        <td>${String(index + 1).padStart(3, "0")}</td>
+        <td>${data.issued_at}</td>
+        <td>${data.customer_name}</td>
+        <td>${data.order_status}</td>
+        <td>Rp. ${data.total_price}</td>
+        <td>
+          <span class="paid ${data.payment_status === "paid" ? "success" : ""}">
+            ${data.payment_status}
+          </span>
+        </td>
+        <td>
+          <a href="#" class="btn btn-sm btn-detail-order" id="openModalBtn">Detail</a>
+        </td>
+      `;
+  
+      tbody.appendChild(row);
+    });
+  } 
+</script>
+<script>
+  document.addEventListener("click", function (event) {
+    // Pastikan tombol yang diklik memiliki class "btn-detail-order"
+    if (event.target.classList.contains("btn-detail-order")) {
+      const rightModal = document.getElementById("rightModal");
+      if (rightModal) {
+        rightModal.classList.add("show");
+      }
+    }
   });
-
-  // Tombol OK di dalam modal
-  okBtn.addEventListener("click", () => {
-    // Refresh halaman atau aksi lain yang diinginkan
-    location.reload();
+  
+  // Menutup modal saat tombol close ditekan
+  document.getElementById("closeModalBtn").addEventListener("click", function () {
+    document.getElementById("rightModal").classList.remove("show");
   });
+  
+  // Menangani tombol OK di modal
+  document.getElementById("okBtn").addEventListener("click", function () {
+    location.reload(); // Refresh halaman atau aksi lain yang diperlukan
+  });
+  
 </script>
 <script>
   const dateNow = new Date();
